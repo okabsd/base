@@ -1,0 +1,146 @@
+= `base`
+
+This is _Yet Another Small Library_ for Lua, providing a foundation for derivative Object-oriented Programming.
+
+Here's a non-trivial example.
+
+[source, lua]
+----
+local Base = require 'base'
+
+local Map = Base:derive(function (_, self)
+    self.data = {}
+end)
+
+function Map.fn:set (k, v)
+    rawset(self.data, k, v)
+end
+
+function Map.fn:get (k)
+    return rawget(self.data, k)
+end
+
+function Map.fn:has (k)
+    return rawget(self.data, k) ~= nil
+end
+
+function Map.fn:size ()
+    local s = 0
+    for _, _ in pairs(self.data) do
+        s = s + 1
+    end
+    return s
+end
+
+local WeakMap = Map:derive(function (source, self, t)
+    source(self)
+    setmetatable(self.data, { __mode = t or 'k' })
+end)
+
+local map = Map()
+map:set('a', 1)
+map:set('b', 2)
+print(map:has('a'), map:get('b'), map:has('c')) -- true, 2, false
+
+local wmap = WeakMap()
+wmap:set(map, {})
+print(wmap:has(map), wmap:size()) -- true, 1
+map = nil
+collectgarbage() -- Force GC
+print(wmap:size()) -- 0
+----
+
+== Install
+
+The easy way is to use Luarocks
+
+[source, shell]
+----
+$ luarocks install base
+----
+
+Alternatively, grab the source from the https://github.com/Okahyphen/base[repo], and manually add it to your project.
+
+== Goals & Reasoning
+
+There are a number of OOP libraries for Lua. Why another?
+
+With `base`, I wanted two main things:
+
+* Tiny library (~30 lines)
+* Clear and concise implementations
+
+I didn't want auxiliary functions, extra padding tables, or an (overly) confusing lexicon. There are no fluffy, duck-typing methods. No add-ons. Nothing special.
+
+There are two distinct notions with `base`: _sources_, and _derivatives_. They are relative terms.
+
+In the example above, `WeakMap` is a _derivative_ of `Map`, which makes `Map` a _source_ for `WeakMap`. You can think of these as parent/children 'classes', but it is important to make the distinction that everything is _hot_ - functions are shared, not copied.
+
+`Base` is the root _source_ for all _derivatives_.
+
+`map` and `wmap` are _instances_ of `Map` and `WeakMap`, respectively.
+
+Ultimately, this is _prototypical_ OOP, but historically we've mashed the terminology of prototypical and classical patterns together, and things have gotten confusing. I think a fresh description is needed.
+
+`base` is bilateral in the way that both shared function tables (`Foo.fn`) and the _derivatives_ themselves (`Foo`) can look to their _sources_ for methods.
+
+> If `Bar` is a derivative of `Foo`, and `Foo` has a method `Foo:abc`, then `Bar` will also have access to that method.
+
+> If `b` is an instance of `Baz`, and `Baz` is a derivative of `Qux`, which has the shared method `Qux.fn:xyz`, then `b` will have access to that method.
+
+This is why `:derive` is available to all _derivatives_.
+
+== Documentation
+
+There's not a whole lot to `base`.
+
+[source, lua]
+----
+local Base = require 'base'
+----
+
+In this case, the return value from `require` is a singleton table, which we call `Base`.
+
+`Base` has a single method, used to create derivatives, `:derive`, which in turn takes a single argument, `initializer`.
+
+[source, lua]
+----
+local List = Base:derive(function (_, self, ...)
+    self.data = { ... }
+end)
+----
+
+`initializer` is a function with the signature `(source, self, ...) -> nil`. This function is called when a new instance of the derivative is constructed, and is passed the following:
+
+* `source` is a function which provides access to the initializer of the _derivative_'s closest _source_. It has the signature `(instance, ...) -> nil`.
+** _Note: when creating a direct derivative of `Base`, `source` is `nil`._
+* `self` is the newly formed instance.
+* `...` are any arguments passed to the constructor.
+
+All _derivatives_ act as constructors when directly invoked.
+
+* _Note: `Base` is unique in that it is not a derivative, has no initializer, and does not act as a constructor._
+
+[source, lua]
+----
+local ls = List('a', 'b', 'c')
+----
+
+Each _derivative_ has a shared function table, `.fn`, which can be used to create methods that any _instances_ of the _derivative_, or _instances_ of any _derivatives_ of the _derivative_ have access to.
+
+* _Note:`Base` also has a shared function table, in the event you want to add some kind of universally shared method. However, generally speaking, this is not a great idea._
+
+[source, lua]
+----
+function List.fn:each (action)
+    for i, v in ipairs(self.data) do
+        action(v, i)
+    end
+end
+----
+
+It should be noted that, for simplicity's sake, _derivatives_, their shared function tables, and their _instances_ all act as their own metatables. You might notice an `index` metaproperty on each object created with this library, as well as some extras on _derivatives_. It's best to not mess with these.
+
+== License
+
+https://raw.githubusercontent.com/Okahyphen/base/master/LICENSE[MIT], just like Lua.
