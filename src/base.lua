@@ -1,6 +1,6 @@
 local Base = { fn = {} }
 
-function new (self, ...)
+local function new (self, ...)
     local instance = { __index = self.fn }
 
     setmetatable(instance, instance)
