@@ -6,36 +6,38 @@ Here's a non-trivial example.
 
 [source, lua]
 ----
-local Base = require 'base'
-
-local Map = Base:derive(function (_, self)
-    self.data = {}
-end)
-
-function Map.fn:set (k, v)
-    rawset(self.data, k, v)
-end
-
-function Map.fn:get (k)
-    return rawget(self.data, k)
-end
-
-function Map.fn:has (k)
-    return rawget(self.data, k) ~= nil
-end
-
-function Map.fn:size ()
-    local s = 0
-    for _, _ in pairs(self.data) do
-        s = s + 1
+local Map = require 'base' : derive(function (fn)
+    function fn:has (key)
+        return rawget(self.data, key) ~= nil
     end
-    return s
-end
 
-local WeakMap = Map:derive(function (source, self, t)
-    source(self)
-    setmetatable(self.data, { __mode = t or 'k' })
+    function fn:get (key)
+        return rawget(self.data, key)
+    end
+
+    function fn:set (key, value)
+        rawset(self.data, key, value)
+    end
+
+    function fn:size ()
+        local sz = 0
+
+        for _, _ in pairs(self.data) do sz = sz + 1 end
+
+        return sz
+    end
+
+    return function (self)
+      self.data = {}
+    end
 end)
+
+local WeakMap = Map:derive(function ()
+    return function (source, self, mode)
+        source(self)
+        setmetatable(self.data, { __mode = mode or 'k' })
+    end
+end
 
 local map = Map()
 map:set('a', 1)
@@ -80,7 +82,7 @@ In the example above, `WeakMap` is a _derivative_ of `Map`, which makes `Map` a 
 
 `map` and `wmap` are _instances_ of `Map` and `WeakMap`, respectively.
 
-Ultimately, this is _prototypical_ OOP, but historically we've mashed the terminology of prototypical and classical patterns together, and things have gotten confusing. I think a fresh description is needed.
+Ultimately, this is _prototypical_ OOP, but historically we've mashed the terminology of prototypical and classical patterns together, and thgings have gotten confusing. I think a fresh description is needed.
 
 `base` is bilateral in the way that both shared function tables (`Foo.fn`) and the _derivatives_ themselves (`Foo`) can look to their _sources_ for methods.
 
@@ -89,6 +91,46 @@ Ultimately, this is _prototypical_ OOP, but historically we've mashed the termin
 > If `b` is an instance of `Baz`, and `Baz` is a derivative of `Qux`, which has the shared method `Qux.fn:xyz`, then `b` will have access to that method.
 
 This is why `:derive` is available to all _derivatives_.
+
+---
+
+Why `2.0.0`?
+
+Version `2.0.0` is a reimplementation of the same ideas. After using `base` for six months, I noticed certain patterns. Mainly, the use of single files for derivatives was common, but lead to a lot of repeated statements. `2.0.0` aims to cut down on those statements, and provide a more concise implementation pattern.
+
+A typical single derivative file, shown in both styles.
+
+`1.0.0`:
+
+[source, lua]
+----
+local Foobar = require 'base' : derive(function (_, self, ...)
+    self.qux = { ... }
+end)
+
+function Foobar:satic_method () [[ ... ]] end
+
+function Foobar.fn:foo () [[ ... ]] end
+function Foobar.fn:bar () [[ ... ]] end
+
+return Foobar
+----
+
+`2.0.0`:
+
+[source, lua]
+----
+return require 'base' : derive(function (fn, D)
+    function D:static_method () [[ ... ]] end
+
+    function fn:foo () [[ ... ]] end
+    function fn:bar () [[ ... ]] end
+
+    return function (self, ...)
+        self.qux = { ... }
+    end
+end)
+----
 
 == Documentation
 
@@ -101,30 +143,21 @@ local Base = require 'base'
 
 In this case, the return value from `require` is a singleton table, which we call `Base`.
 
-`Base` has a single method, used to create derivatives, `:derive`, which in turn takes a single argument, `initializer`.
+`Base` has a single method, used to create derivatives, `:derive`, which in turn takes a single argument, `context`.
+
+`context` is a function with the signature `(fn, Derivative) -> function`. This function is called when the new derivative is formed, and is passed the following:
+
+* `fn` is the shared function table, a shortcut for `Derivative.fn`.
+* `Derivative` is the new _derivative_.
 
 [source, lua]
 ----
-local List = Base:derive(function (_, self, ...)
-    self.data = { ... }
+local List = Base:derive(function (fn, Derivative)
+    [[ ... ]]
 end)
 ----
 
-`initializer` is a function with the signature `(source, self, ...) -> nil`. This function is called when a new instance of the derivative is constructed, and is passed the following:
-
-* `source` is a function which provides access to the initializer of the _derivative_'s closest _source_. It has the signature `(instance, ...) -> nil`.
-** _Note: when creating a direct derivative of `Base`, `source` is an incomplete function and should be ignored._
-* `self` is the newly formed instance.
-* `...` are any arguments passed to the constructor.
-
-All _derivatives_ act as constructors when directly invoked.
-
-* _Note: `Base` is unique in that it is not a derivative, has no initializer, and does not act as a constructor._
-
-[source, lua]
-----
-local ls = List('a', 'b', 'c')
-----
+---
 
 Each _derivative_ has a shared function table, `.fn`, which can be used to create methods that any _instances_ of the _derivative_, or _instances_ of any _derivatives_ of the _derivative_ have access to.
 
@@ -132,14 +165,67 @@ Each _derivative_ has a shared function table, `.fn`, which can be used to creat
 
 [source, lua]
 ----
-function List.fn:each (action)
-    for i, v in ipairs(self.data) do
-        action(v, i)
+local List = Base:derive(function (fn, Derivative)
+    function fn:each (action)
+        for i, v in ipairs(self.data) do
+            action(v, i)
+        end
     end
-end
+
+    [[ ... ]]
+end)
 ----
 
-It should be noted that, for simplicity's sake, _derivatives_, their shared function tables, and their _instances_ all act as their own metatables. You might notice an `index` metaproperty on each object created with this library, as well as some extras on _derivatives_. It's best to not mess with these.
+---
+
+The return value of `context` must be a function, which acts as an _initializer_ for new _instances_ of the _derivative_. We'll simply call it `initializer`.
+
+The function signature of `initializer` depends on whether you are deriving a new _derivative_ directly from `Base` or not:
+
+> When deriving a new _derivative_ directly from `Base`, the `source` argument is absent, and the argument list begins from `self`.
+
+* `source` is a function which provides access to the initializer of the _derivative_'s closest _source_. It has the signature `(instance, ...) -> nil`.
+* `self` is the newly formed _instance_.
+* `...` are any arguments passed to the constructor.
+
+[source, lua]
+----
+local List = Base:derive(function (fn, Derivative)
+    return function (self, ...)
+        self.data = { ... }
+    end
+end)
+
+local List2 = List:derive(function (fn, Derivative)
+    function fn:print ()
+        self:each(print)
+    end
+
+    return function (source, self, ...)
+        source(self, ...)
+    end
+end)
+----
+
+---
+
+All _derivatives_ act as constructors when directly invoked, returning the newly formed _instance_.
+
+* _Note: `Base` is unique in that it is not a derivative, has no initializer, and does not act as a constructor._
+
+[source, lua]
+----
+local ls = List('a', 'b', 'c')
+
+ls:each(print)
+
+local ls2 = List2('d', 'e', 'f')
+ls2:print()
+----
+
+---
+
+It should be noted that, for simplicity's sake, _derivatives_, their shared function tables, and their _instances_ all act as their own metatables. You might notice an `index` metaproperty on each object created with this library, as well as some extras on _derivatives_. It's best to not mess with these members.
 
 == License
 

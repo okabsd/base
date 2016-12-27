@@ -1,32 +1,34 @@
-local Base = require 'base'
+local Map = require 'base' : derive(function (fn)
+	function fn:has (key)
+		return rawget(self.data, key) ~= nil
+	end
 
-local Map = Base:derive(function (_, self)
-    self.data = {}
+	function fn:get (key)
+		return rawget(self.data, key)
+	end
+
+	function fn:set (key, value)
+		rawset(self.data, key, value)
+	end
+
+	function fn:size ()
+		local sz = 0
+
+		for _, _ in pairs(self.data) do sz = sz + 1 end
+
+		return sz
+	end
+
+	return function (self)
+		self.data = {}
+	end
 end)
 
-function Map.fn:set (k, v)
-    rawset(self.data, k, v)
-end
-
-function Map.fn:get (k)
-    return rawget(self.data, k)
-end
-
-function Map.fn:has (k)
-    return rawget(self.data, k) ~= nil
-end
-
-function Map.fn:size ()
-    local s = 0
-    for _, _ in pairs(self.data) do
-	s = s + 1
-    end
-    return s
-end
-
-local WeakMap = Map:derive(function (source, self, t)
-    source(self)
-    setmetatable(self.data, { __mode = t or 'k' })
+local WeakMap = Map:derive(function ()
+	return function (source, self, mode)
+		source(self)
+		setmetatable(self.data, { __mode = mode or 'k' })
+	end
 end)
 
 local map = Map()

@@ -1,29 +1,32 @@
-local Base = { fn = {} }
+local function selfmetatable (T) return setmetatable(T, T) end
 
-local function new (self, ...)
-    local instance = { __index = self.fn }
+local function init (D, inst, ...)
+	if D.__source__ then
+		D.__init__(D.__source__, inst, ...)
+	else
+		D.__init__(inst, ...)
+	end
 
-    setmetatable(instance, instance)
-    self.__initializer(self.__source, instance, ...)
-
-    return instance
+	return inst
 end
 
-function Base:derive (initializer)
-    local Derivative = {
-	__call = new,
-	__index = self,
-	__initializer = initializer,
-	fn = { __index = self.fn }
-    }
+local function new (D, ...)
+	return init(D, selfmetatable { __index = D.fn }, ...)
+end
 
-    function Derivative.__source (instance, ...)
-	self.__initializer(self.__source, instance, ...)
-    end
+local Base = selfmetatable { fn = {} }
 
-    setmetatable(Derivative.fn, Derivative.fn)
+function Base:derive (context)
+	local Derivative = selfmetatable {
+		fn = selfmetatable { __index = self.fn },
+		__call = new,
+		__index = self,
+		__source__ = self ~= Base and function (inst, ...) init(self, inst, ...) end,
+	}
 
-    return setmetatable(Derivative, Derivative)
+	Derivative.__init__ = context(Derivative.fn, Derivative)
+
+	return Derivative
 end
 
 return Base
