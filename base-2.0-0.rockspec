@@ -6,12 +6,12 @@ description = {
 	This is Yet Another Small Library for Lua,
 	providing a foundation for derivative Object-oriented Programming.
 	]],
-	homepage = 'http://base.oka.io',
+	homepage = 'https://github.com/okabsd/base',
 	maintainer = 'yo@oka.io',
 	license = 'MIT'
 }
 source = {
-	url = 'git://github.com/Okahyphen/base',
+	url = 'git://github.com/okabsd/base',
 	tag = 'v2.0.0'
 }
 dependencies = {
