@@ -61,7 +61,7 @@ The easy way is to use https://luarocks.org/modules/oka/base[`luarocks`].
 $ luarocks install base
 ----
 
-Alternatively, grab the https://github.com/Okahyphen/base[source], and manually add it to your project.
+Alternatively, grab the https://github.com/okabsd/base[source], and manually add it to your project.
 
 == Goals & Reasoning
 
@@ -69,7 +69,7 @@ There are a number of OOP libraries for Lua. Why another?
 
 With `base`, I wanted two main things:
 
-* Tiny library (~30 lines)
+* Tiny, uncomplicated library
 * Clear and concise implementations
 
 I didn't want auxiliary functions, extra padding tables, or an (overly) confusing lexicon. There are no fluffy, duck-typing methods. No add-ons. Nothing special.
@@ -81,8 +81,6 @@ In the example above, `WeakMap` is a _derivative_ of `Map`, which makes `Map` a 
 `Base` is the root _source_ for all _derivatives_.
 
 `map` and `wmap` are _instances_ of `Map` and `WeakMap`, respectively.
-
-Ultimately, this is _prototypical_ OOP, but historically we've mashed the terminology of prototypical and classical patterns together, and thgings have gotten confusing. I think a fresh description is needed.
 
 `base` is bilateral in the way that both shared function tables (`Foo.fn`) and the _derivatives_ themselves (`Foo`) can look to their _sources_ for methods.
 
@@ -96,7 +94,7 @@ This is why `:derive` is available to all _derivatives_.
 
 Why `2.0.0`?
 
-Version `2.0.0` is a reimplementation of the same ideas. After using `base` for six months, I noticed certain patterns. Mainly, the use of single files for derivatives was common, but lead to a lot of repeated statements. `2.0.0` aims to cut down on those statements, and provide a more concise implementation pattern.
+Version `2.0.0` is a reimplementation of the same ideas. After using `base` for some time, I noticed certain patterns. Mainly, the use of single files for derivatives was common, but lead to a lot of repeated statements. `2.0.0` aims to cut down on those statements, and provide a more concise implementation pattern.
 
 A typical single derivative file, shown in both styles.
 
@@ -229,4 +227,4 @@ It should be noted that, for simplicity's sake, _derivatives_, their shared func
 
 == License
 
-https://raw.githubusercontent.com/Okahyphen/base/master/LICENSE[MIT], just like Lua.
+https://raw.githubusercontent.com/okabsd/base/master/LICENSE[MIT], just like Lua.
